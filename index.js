@@ -38,14 +38,27 @@ async function run() {
     // ===== HABBITS ROUTES =====
 
     app.get("/habbits", async (req, res) => {
-      const { userEmail, category } = req.query;
-      const quary = {};
-      if (userEmail) quary.userEmail = userEmail;
-      if (category) quary.category = category;
+  try {
+    const { userEmail, category, home } = req.query;
+    const query = {};
 
-      const result = await HabbitCollection.find(quary).toArray();
-      res.send(result);
-    });
+    if (userEmail) query.userEmail = userEmail;
+    if (category) query.category = category;
+
+    let cursor = HabbitCollection.find(query).sort({ _id: -1 });
+
+    // If home=true → send only 6 recent habits
+    if (home === "true") {
+      cursor = cursor.limit(6);
+    }
+
+    const result = await cursor.toArray();
+    res.status(200).send(result);
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
 
     app.get("/habbits/:id", async (req, res) => {
       const result = await HabbitCollection.findOne({ _id: new ObjectId(req.params.id) });
@@ -87,6 +100,47 @@ async function run() {
       }
     });
 
+    // Mark a habit as completed for today only user
+app.patch("/habbits/:id/complete", async (req, res) => {
+  try {
+    const { userEmail } = req.body;
+    if (!userEmail) {
+      return res.status(400).send({ message: "userEmail required" });
+    }
+
+    const habitId = req.params.id;
+    const habit = await HabbitCollection.findOne({ _id: new ObjectId(habitId) });
+
+    if (!habit) return res.status(404).send({ message: "Habit not found" });
+
+    if (habit.userEmail !== userEmail)
+      return res.status(403).send({ message: "You can only update your own habit" });
+
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    // If completionHistory is missing create it
+    const completionHistory = habit.completionHistory || [];
+
+    // Check duplicate same day
+    if (completionHistory.includes(today)) {
+      return res.status(400).send({ message: "Already marked completed today" });
+    }
+
+    // Push today's date
+    completionHistory.push(today);
+
+    const result = await HabbitCollection.updateOne(
+      { _id: new ObjectId(habitId) },
+      { $set: { completionHistory } }
+    );
+
+    res.send({ message: "Habit marked complete", result, completionHistory });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
+
+
     // DELETE a habbit - only owner
     app.delete("/habbits/:id", async (req, res) => {
       try {
@@ -106,53 +160,7 @@ async function run() {
       }
     });
 
-    // ===== TRACKHABBIT ROUTES =====
-
-    app.get("/trackhabbit/:habitId", async (req, res) => {
-      const { habitId } = req.params;
-      const { userEmail } = req.query;
-      if (!userEmail) return res.status(400).send({ message: "userEmail required" });
-
-      const habit = await HabbitCollection.findOne({ _id: new ObjectId(habitId) });
-      if (!habit) return res.status(404).send({ message: "Habbit not found" });
-
-      const track = await TrackHabbit.findOne({ habitId: new ObjectId(habitId), userEmail });
-
-      const today = new Date();
-      const last30Days = [...Array(30)].map((_, i) => {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split("T")[0];
-      });
-
-      const completedDates = track?.completionHistory || [];
-      const completedInLast30 = completedDates.filter(date => last30Days.includes(date));
-      const progress = Math.round((completedInLast30.length / 30) * 100);
-
-      let streak = 0;
-      for (let i = 0; i < last30Days.length; i++) {
-        if (completedDates.includes(last30Days[i])) streak++;
-        else break;
-      }
-
-      res.send({ habit, progress, streak, completedDates });
-    });
-
-    app.post("/trackhabbit/:habitId/complete", async (req, res) => {
-      const { habitId } = req.params;
-      const { userEmail } = req.body;
-      if (!userEmail) return res.status(400).send({ message: "userEmail required" });
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const result = await TrackHabbit.updateOne(
-        { habitId: new ObjectId(habitId), userEmail },
-        { $addToSet: { completionHistory: today } },
-        { upsert: true }
-      );
-
-      res.send({ message: "Habbit marked complete", result });
-    });
+    
 
     console.log("Server connected to MongoDB successfully!");
   } finally {
