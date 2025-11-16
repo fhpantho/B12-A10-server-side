@@ -37,27 +37,46 @@ async function run() {
 
     // ===== HABBITS ROUTES =====
 
-    app.get("/habbits", async (req, res) => {
+   app.get("/habbits", async (req, res) => {
   try {
-    const { userEmail, category, home } = req.query;
+    const { userEmail, category, search, home } = req.query;
+
     const query = {};
 
+    // Filter by specific user (if provided)
     if (userEmail) query.userEmail = userEmail;
-    if (category) query.category = category;
 
+    // Filter by category
+    if (category && category !== "All") {
+      query.category = category;
+    }
+
+    // 1) First get from DB using query (category + userEmail)
     let cursor = HabbitCollection.find(query).sort({ _id: -1 });
 
-    // If home=true → send only 6 recent habits
+    // Home page -> limit 6 habits
     if (home === "true") {
       cursor = cursor.limit(6);
     }
 
-    const result = await cursor.toArray();
-    res.status(200).send(result);
+    let results = await cursor.toArray();
+
+    // 2) Apply search filtering (title)
+    if (search && search.trim() !== "") {
+      const s = search.toLowerCase();
+      results = results.filter((h) =>
+        h.title.toLowerCase().includes(s)
+      );
+    }
+
+    res.status(200).send(results);
+
   } catch (err) {
     res.status(500).send({ message: err.message });
   }
 });
+
+
 
 
     app.get("/habbits/:id", async (req, res) => {
