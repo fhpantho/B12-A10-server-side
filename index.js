@@ -67,7 +67,18 @@ app.get("/habbits", async (req, res) => {
   }
 });
 
+app.get("/habbits/:id", async (req, res) => {
+  try {
+    await connectDB();
+    const db = client.db(process.env.MONGO_DB);
+    const HabbitCollection = db.collection("habit");
 
+    const habit = await HabbitCollection.findOne({ _id: new ObjectId(req.params.id) });
+    res.status(200).send(habit);
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+});
 
 app.post("/habbits", async (req, res) => {
   try {
