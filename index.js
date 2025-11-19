@@ -6,9 +6,13 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:5173", /* আপনার frontend domain */],
+  origin: [
+    "http://localhost:5173",
+    "https://habbit-tracker-fhpantho.netlify.app"
+  ],
   credentials: true
 }));
+
 app.use(express.json());
 
 // MongoDB URI
@@ -32,17 +36,7 @@ async function connectDB() {
   return cachedClient;
 }
 
-// Test route to check DB connection
-app.get("/test-db", async (req, res) => {
-  try {
-    await connectDB();
-    const db = client.db(process.env.MONGO_DB);
-    const collections = await db.listCollections().toArray();
-    res.send({ connected: true, collections });
-  } catch (err) {
-    res.status(500).send({ connected: false, error: err.message });
-  }
-});
+
 
 // Habits routes
 
