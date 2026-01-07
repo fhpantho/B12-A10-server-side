@@ -317,14 +317,44 @@ app.get("/dashboard-stats", async (req, res) => {
 });
 
 // Default root route
+
+// Contact form endpoint
+const nodemailer = require("nodemailer");
+app.post("/api/contact", async (req, res) => {
+  const { name, email, message } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ message: "All fields required" });
+  }
+  try {
+    // Configure transporter (using Gmail SMTP for example)
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.CONTACT_EMAIL_USER, // your gmail address
+        pass: process.env.CONTACT_EMAIL_PASS, // your gmail app password
+      },
+    });
+    await transporter.sendMail({
+      from: `Habit Tracker Contact <${process.env.CONTACT_EMAIL_USER}>`,
+      to: "fahim1020pantho@gmail.com",
+      subject: `New Contact Form Submission from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`,
+    });
+    res.status(200).json({ message: "Message sent successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to send email" });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("App is running");
 });
 
 module.exports = app;
 
-const port = process.env.PORT || 5000;
+// const port = process.env.PORT || 5000;
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(`Server running on port ${port}`);
+// });
